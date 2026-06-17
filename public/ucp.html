@@ -1,0 +1,441 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#040406" />
+  <title>Avox Roleplay — Control Panel</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="ucp-mode">
+  <div class="ucp-shell" id="root">
+    <div style="padding:40px;text-align:center;color:var(--text-dim);">Loading your profile…</div>
+  </div>
+
+  <nav class="ucp-dock-wrap" aria-label="UCP navigation">
+    <div class="ucp-dock" id="ucpDock"></div>
+  </nav>
+
+  <script src="/js/common.js"></script>
+  <script>
+    function showUcpError(msg, retry) {
+      const root = document.getElementById('root');
+      root.innerHTML = `
+        <div class="ucp-panel" style="margin:40px auto;max-width:480px;text-align:center;">
+          <div class="alert-error" style="margin-bottom:16px;">${Avox.esc(msg)}</div>
+          ${retry ? '<button class="btn btn-primary" type="button" id="ucpRetry">Try again</button>' : ''}
+          <a class="btn btn-ghost" href="/login" style="margin-left:8px;">Log in again</a>
+        </div>`;
+      document.getElementById('ucpRetry')?.addEventListener('click', () => boot());
+    }
+
+    const STAT_ICONS = {
+      Phone: 'ic-stat-phone', Job: 'ic-stat-job', Faction: 'ic-stat-faction',
+      Hours: 'ic-stat-time', 'Last login': 'ic-stat-time', Registered: 'ic-stat-time',
+      Business: 'ic-briefcase', Crimes: 'ic-ban', Rank: 'ic-dock-faction',
+    };
+
+    function renderDock() {
+      Avox.mountUcpDock(Avox.dockKeyFromPath() || 'ucp');
+    }
+
+    function vipLabel(pkg) {
+      if ((pkg || 0) <= 2) return '';
+      const tiers = { 3: 'SILVER', 4: 'GOLD', 5: 'PLATINUM' };
+      return tiers[pkg] || `VIP ${pkg}`;
+    }
+
+    async function boot() {
+      await Avox.loadConfig();
+      await Avox.refreshUser();
+      const root = document.getElementById('root');
+      root.innerHTML = `
+        <div class="ucp-loading">
+          <div class="ucp-spinner"></div>
+          <div>Loading your profile…</div>
+        </div>`;
+      renderDock();
+
+      let data;
+      try {
+        data = await Avox.api('/api/user/profile', { timeout: 25000 });
+      } catch (e) {
+        if (e.status === 401) return Avox.logout();
+        showUcpError(e.message || 'Failed to load profile.', true);
+        return;
+      }
+
+      try {
+        const u = data.user;
+        if (!u) throw new Error('Profile data is empty.');
+
+        const vehicles = Array.isArray(data.vehicles) ? data.vehicles : [];
+        const houses = Array.isArray(data.houses) ? data.houses : [];
+
+        let credits = 0;
+        try { credits = (await Avox.api('/api/shop/credits', { timeout: 12000 })).balance || 0; } catch (_) {}
+
+        const xpForNext = Math.max(1, (u.level || 1) * 4);
+        const xpCur = (u.exp || 0) % xpForNext;
+        const xpPct = Math.min(100, Math.round((xpCur / xpForNext) * 100));
+        const ach = buildAchievements(u);
+        const achUnlocked = ach.filter((a) => a.unlocked).length;
+        const vip = vipLabel(u.vippackage);
+        const vipUntil = u.viptime ? Avox.fmtDate(u.viptime) : '';
+        const hasHouse = houses.length > 0;
+        const hasBiz = false;
+        const displayName = String(u.username || '').replace(/_/g, ' ');
+        const carLic = (u.carlicense || 0) > 0;
+        const gunLic = (u.gunlicense || 0) > 0;
+        const gunFlagged = !gunLic && (u.wantedlevel || 0) > 0;
+
+      root.innerHTML = `
+        <header class="dash-top">
+          <div class="dash-top-left">
+            <div class="ucp-avatar av-grad-${Avox.avGrad(u.username)}">${Avox.esc(Avox.initials(u.username))}</div>
+            <div class="dash-profile">
+              <div class="dash-name-row">
+                <span class="name">${Avox.esc(displayName)}</span>
+                <span class="uid">UID #${u.uid}</span>
+              </div>
+              <div class="dash-level-row">
+                <span class="lvl-tag">Level ${u.level || 1}</span>
+                <div class="mini-xp-bar"><span style="width:${xpPct}%"></span></div>
+                <span>${xpCur}/${xpForNext}</span>
+              </div>
+              ${vip ? `<div class="dash-vip-row"><span class="vip-badge">${Avox.dashIcon('ic-vip', 14)} ${vip} VIP</span>${vipUntil ? `<span class="muted" style="font-size:10px;">until ${Avox.esc(vipUntil)}</span>` : ''}</div>` : ''}
+            </div>
+          </div>
+
+          <nav class="dash-top-nav" aria-label="Main">
+            <a href="/ucp" class="active">Dashboard</a>
+            <a href="/shop">Shop</a>
+            <a href="/tickets">Tickets</a>
+            <a href="/rules">Rules</a>
+            ${Avox.isAdmin(u) ? '<a href="/admin">Admin</a>' : ''}
+          </nav>
+
+          <div class="dash-top-status">
+            <div class="ucp-pill warn">
+              <div class="ic">${Avox.dashIcon('ic-warning', 28)}</div>
+              <div><div class="val">${u.warnings || 0}</div><div class="lbl">Warnings</div></div>
+            </div>
+            <div class="ucp-pill ban">
+              <div class="ic">${Avox.dashIcon('ic-ban', 28)}</div>
+              <div><div class="val">${u.arrested || 0}</div><div class="lbl">Bans</div></div>
+            </div>
+          </div>
+
+          <div class="dash-top-wallet">
+            <div class="wallet-chip credits">
+              <span class="w-label">Credits</span>
+              <div class="w-row">
+                <span class="w-ic">${Avox.dashIcon('ic-coin', 22)}</span>
+                <span class="amount">${Avox.fmtNum(credits)}</span>
+              </div>
+            </div>
+            <div class="wallet-chip cash">
+              <span class="w-label">Cash</span>
+              <div class="w-row">
+                <span class="w-ic">${Avox.dashIcon('ic-cash', 22)}</span>
+                <span class="amount">${Avox.fmtMoney(u.cash || 0)}</span>
+              </div>
+            </div>
+            <div class="wallet-chip bank">
+              <span class="w-label">Bank</span>
+              <div class="w-row">
+                <span class="w-ic">${Avox.dashIcon('ic-bank', 22)}</span>
+                <span class="amount">${Avox.fmtMoney(u.bank || 0)}</span>
+              </div>
+            </div>
+            <a class="wallet-plus" href="/shop" title="Shop">+</a>
+            <button type="button" class="btn btn-sm btn-ghost" style="margin-left:8px;" onclick="Avox.logout()">Log out</button>
+          </div>
+        </header>
+
+        <div class="ucp-grid">
+          <aside class="ucp-side-left">
+            <div class="ucp-level-card">
+              <div class="lbl">Character level</div>
+              <div class="lvl">${u.level || 1}</div>
+              <div class="xp-bar"><span style="width:${xpPct}%"></span></div>
+              <div class="xp-txt">${xpCur} / ${xpForNext} XP · ${xpPct}%</div>
+            </div>
+            <h4>Details</h4>
+            ${statRow('Phone', u.phone || '—')}
+            ${statRow('Crimes', u.crimes || 0)}
+            ${statRow('Business', hasBiz ? 'Owned' : 'None')}
+            ${statRow('Job', jobName(u.job))}
+            ${statRow('Faction', data.factionName || 'None')}
+            ${statRow('Rank', u.factionrank > 0 ? u.factionrank : '—')}
+            ${statRow('Hours', Avox.fmtNum(u.hours || 0) + 'h')}
+            ${statRow('Last login', Avox.fmtRelative(u.lastlogin))}
+            ${statRow('Registered', Avox.fmtDate(u.regdate))}
+          </aside>
+
+          <section class="ucp-main">
+            <div class="ucp-cards-4">
+              <div class="dash-card purple">
+                <div class="icon-box">${Avox.dashIcon('ic-house', 36)}</div>
+                <h3>House</h3>
+                <div class="sub">${hasHouse ? houses.length + ' propert' + (houses.length === 1 ? 'y' : 'ies') : 'No property yet'}</div>
+                <a class="btn-dash" href="/shop">${hasHouse ? 'Manage' : 'Buy'}</a>
+              </div>
+              <div class="dash-card green">
+                <div class="icon-box">${Avox.dashIcon('ic-briefcase', 36)}</div>
+                <h3>Business</h3>
+                <div class="sub">${hasBiz ? 'Active business' : 'No business owned'}</div>
+                <a class="btn-dash outline" href="/shop">Buy</a>
+              </div>
+              <div class="dash-card gold">
+                <div class="icon-box">${Avox.dashIcon('ic-star', 36)}</div>
+                <h3>Achievements</h3>
+                <div class="sub">${achUnlocked} of ${ach.length} unlocked</div>
+                <button class="btn-dash" type="button" onclick="document.getElementById('achievements').scrollIntoView({behavior:'smooth'})">View</button>
+              </div>
+              <div class="dash-card blue">
+                <div class="icon-box">${Avox.dashIcon('ic-tasks', 36)}</div>
+                <h3>Daily progress</h3>
+                <div class="sub">${u.minutes || 0} min played this session</div>
+                <a class="btn-dash outline" href="samp://${Avox.SERVER_ADDR}">Play now</a>
+              </div>
+            </div>
+
+            <div class="ucp-banners">
+              <div class="promo-banner roulette">
+                <div class="banner-art">${Avox.dashIcon('ic-roulette')}</div>
+                <h4>Play roulette &amp; earn rewards</h4>
+                <p>Log more hours this week for bonus credits and exclusive items.</p>
+                <a class="btn-promo" href="/shop">Play now</a>
+              </div>
+              <div class="promo-banner flash">
+                <div class="banner-art">${Avox.dashIcon('ic-flash')}</div>
+                <span class="tag-flash">FLASH SALE</span>
+                <h4>Double credits weekend</h4>
+                <p>Top up via shop and get 2× credits — limited time only.</p>
+                <a class="btn-promo" href="/shop">Top up</a>
+              </div>
+            </div>
+
+            <div class="ucp-panel" id="achievements">
+              <div class="ucp-panel-head">
+                <div class="ph-ic">${Avox.dashIcon('ic-star', 28)}</div>
+                <h3>Achievements</h3>
+              </div>
+              <div class="achv-grid">
+                ${ach.map((a) => `
+                  <div class="achv ${a.unlocked ? '' : 'locked'}">
+                    <div class="ic">${Avox.svgIcon(a.icon, { size: 20 })}</div>
+                    <div class="name">${Avox.esc(a.name)}</div>
+                    <div class="desc">${Avox.esc(a.desc)}</div>
+                  </div>`).join('')}
+              </div>
+            </div>
+
+            <div class="grid grid-2">
+              ${propertyPanel('Vehicles', vehicles, (v) => `
+                <tr><td>${v.id ?? '—'}</td><td>${v.model ?? v.modelid ?? '—'}</td><td>${Avox.esc(v.plate || v.numberplate || '—')}</td></tr>`,
+                ['ID', 'Model', 'Plate'])}
+              ${propertyPanel('Houses', houses, (h) => `
+                <tr><td>${h.id ?? '—'}</td><td>${Avox.esc(h.address || h.name || '—')}</td><td>${Avox.fmtMoney(h.price || 0)}</td></tr>`,
+                ['ID', 'Address', 'Value'])}
+            </div>
+
+            <div class="ucp-panel" id="settings">
+              <div class="ucp-panel-head">
+                <div class="ph-ic">${Avox.dashIcon('ic-dock-settings', 28)}</div>
+                <div><h3>Account settings</h3><p class="muted" style="margin:4px 0 0;font-size:12px;">Change your password — email verification required</p></div>
+              </div>
+              <form class="form pw-otp-form" id="pwForm" style="max-width:420px;">
+                <div id="pwMsg"></div>
+                <div class="field">
+                  <label>Email for verification</label>
+                  <input name="email" type="email" autocomplete="email" placeholder="you@example.com" required />
+                  <div class="hint" id="pwEmailHint">A 6-digit code will be sent to this address.</div>
+                </div>
+                <div class="field">
+                  <label>Current password</label>
+                  <input name="currentPassword" type="password" required autocomplete="current-password" />
+                </div>
+                <div class="field otp-send-row">
+                  <button type="button" class="btn btn-outline" id="pwSendOtp">Send verification code</button>
+                  <span class="muted" id="pwOtpStatus" style="font-size:12px;"></span>
+                </div>
+                <div class="field">
+                  <label>Verification code (OTP)</label>
+                  <input name="otp" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="000000" required autocomplete="one-time-code" class="otp-input" />
+                </div>
+                <div class="field"><label>New password</label><input name="newPassword" type="password" required minlength="4" autocomplete="new-password" /></div>
+                <div class="field"><label>Confirm</label><input name="confirmPassword" type="password" required autocomplete="new-password" /></div>
+                <button type="submit" class="btn btn-primary">Update password</button>
+              </form>
+            </div>
+          </section>
+
+          <aside class="ucp-side-right">
+            <h4>Licenses</h4>
+            ${licenseCard('lic-car', 'ic-car', 'Auto license', carLic ? 'active' : 'none')}
+            ${licenseCard('lic-moto', 'ic-moto', 'Moto license', 'none')}
+            ${licenseCard('lic-plane', 'ic-plane', 'Aviation', 'none')}
+            ${licenseCard('lic-boat', 'ic-boat', 'Boat license', 'none')}
+            ${licenseCard('lic-gun', 'ic-gun', 'Weapon permit', gunLic ? 'active' : gunFlagged ? 'flagged' : 'none')}
+            <h4 style="margin-top:18px;">Character</h4>
+            ${statRow('Health', Math.round(u.health || 0) + ' HP')}
+            ${statRow('Armor', Math.round(u.armor || 0))}
+            ${statRow('Gender', u.gender ? 'Male' : 'Female')}
+            ${statRow('Age', u.age || '—')}
+            ${data.gangName ? statRow('Gang', data.gangName) : ''}
+          </aside>
+        </div>
+      `;
+
+        wirePwForm();
+        renderDock();
+        requestAnimationFrame(() => Avox.handleUcpHashScroll());
+        requestAnimationFrame(() => document.querySelector('.ucp-grid')?.classList.add('visible'));
+      } catch (e) {
+        console.error('[ucp]', e);
+        showUcpError(e.message || 'Could not render dashboard.', true);
+      }
+    }
+
+    function statRow(k, v, iconId) {
+      const ic = iconId || STAT_ICONS[k];
+      const iconHtml = ic ? `<span class="stat-ic">${Avox.dashIcon(ic, 20)}</span>` : '';
+      return `<div class="ucp-stat-row">${iconHtml}<div class="stat-body"><span class="k">${Avox.esc(k)}</span><span class="v">${Avox.esc(String(v ?? '—'))}</span></div></div>`;
+    }
+
+    function licenseCard(cls, icon, name, statusKey) {
+      const labels = { active: 'Active', none: 'None', flagged: 'Flagged' };
+      const label = labels[statusKey] || statusKey;
+      return `<div class="lic-card ${cls}">
+        <div class="lic-info">
+          <div class="lic-name">${Avox.esc(name)}</div>
+          <span class="lic-status ${Avox.esc(statusKey)}">${Avox.esc(label)}</span>
+        </div>
+        <div class="lic-art">${Avox.dashIcon(icon, 80)}</div>
+      </div>`;
+    }
+
+    function propertyPanel(title, items, rowFn, headers) {
+      const icon = title === 'Vehicles' ? 'ic-car' : 'ic-house';
+      if (!items.length) {
+        return `<div class="ucp-panel"><div class="ucp-panel-head"><div class="ph-ic">${Avox.dashIcon(icon, 28)}</div><h3>${Avox.esc(title)} (0)</h3></div><div class="muted center" style="padding:24px;">None yet.</div></div>`;
+      }
+      return `<div class="ucp-panel"><div class="ucp-panel-head"><div class="ph-ic">${Avox.dashIcon(icon, 28)}</div><h3>${Avox.esc(title)} (${items.length})</h3></div>
+        <div class="table-wrap"><table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead>
+        <tbody>${items.map((it) => rowFn(it)).join('')}</tbody></table></div></div>`;
+    }
+
+    function buildAchievements(u) {
+      return [
+        { name: 'First steps', desc: 'Reach level 5', icon: 'bolt', unlocked: (u.level || 0) >= 5 },
+        { name: 'Veteran', desc: '100+ hours', icon: 'pulse', unlocked: (u.hours || 0) >= 100 },
+        { name: 'Citizen', desc: '500+ hours', icon: 'shield', unlocked: (u.hours || 0) >= 500 },
+        { name: 'Pro level', desc: 'Level 25', icon: 'trophy', unlocked: (u.level || 0) >= 25 },
+        { name: 'Millionaire', desc: '$1M wealth', icon: 'money', unlocked: ((u.cash||0)+(u.bank||0)) >= 1e6 },
+        { name: 'VIP', desc: 'Any VIP package', icon: 'crown', unlocked: (u.vippackage||0) > 2 },
+        { name: 'Faction', desc: 'Join a faction', icon: 'shield', unlocked: Number(u.faction) >= 0 },
+        { name: 'Staff', desc: 'Team member', icon: 'users', unlocked: (u.adminlevel||0) > 0 },
+      ];
+    }
+
+    function jobName(id) {
+      const jobs = { '-1': 'Unemployed', 0: 'Detective', 1: 'Lawyer', 2: 'Mechanic', 3: 'Courier', 4: 'Trucker' };
+      return jobs[String(id)] ?? (id != null ? `Job #${id}` : 'Unemployed');
+    }
+
+    function wirePwForm() {
+      const form = document.getElementById('pwForm');
+      if (!form) return;
+
+      const msg = document.getElementById('pwMsg');
+      const otpStatus = document.getElementById('pwOtpStatus');
+      const sendBtn = document.getElementById('pwSendOtp');
+      const emailHint = document.getElementById('pwEmailHint');
+
+      Avox.api('/api/auth/email-status').then((st) => {
+        if (st.email) form.email.value = st.email;
+        if (st.masked) {
+          emailHint.textContent = `Code will be sent to ${st.masked}. You can change the email below.`;
+        }
+        if (st.smtpReady === false) {
+          msg.innerHTML = '<div class="alert-error">Email verification is not configured on the server yet.</div>';
+          sendBtn.disabled = true;
+        }
+      }).catch(() => {});
+
+      sendBtn.addEventListener('click', async () => {
+        msg.innerHTML = '';
+        otpStatus.textContent = '';
+        if (!form.currentPassword.value) {
+          msg.innerHTML = '<div class="alert-error">Enter your current password first.</div>';
+          return;
+        }
+        if (!form.email.value.trim()) {
+          msg.innerHTML = '<div class="alert-error">Enter your email address.</div>';
+          return;
+        }
+        sendBtn.disabled = true;
+        sendBtn.textContent = 'Sending…';
+        try {
+          const r = await Avox.api('/api/auth/password-otp/send', {
+            method: 'POST',
+            body: JSON.stringify({
+              currentPassword: form.currentPassword.value,
+              email: form.email.value.trim(),
+            }),
+          });
+          otpStatus.textContent = r.message || 'Code sent.';
+          emailHint.textContent = `Code sent to ${r.masked}. Expires in ${r.expiresInMinutes} min.`;
+          Avox.toast('Verification code sent', 'success');
+          form.otp.focus();
+        } catch (err) {
+          msg.innerHTML = `<div class="alert-error">${Avox.esc(err.message)}</div>`;
+        } finally {
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Send verification code';
+        }
+      });
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        msg.innerHTML = '';
+        if (form.newPassword.value !== form.confirmPassword.value) {
+          msg.innerHTML = '<div class="alert-error">Passwords do not match.</div>';
+          return;
+        }
+        if (!/^\d{6}$/.test(form.otp.value.trim())) {
+          msg.innerHTML = '<div class="alert-error">Enter the 6-digit verification code from your email.</div>';
+          return;
+        }
+        const btn = form.querySelector('[type=submit]');
+        btn.disabled = true;
+        try {
+          await Avox.api('/api/auth/change-password', {
+            method: 'POST',
+            body: JSON.stringify({
+              currentPassword: form.currentPassword.value,
+              newPassword: form.newPassword.value,
+              otp: form.otp.value.trim(),
+            }),
+          });
+          msg.innerHTML = '<div class="alert-success">Password updated successfully.</div>';
+          Avox.toast('Password updated', 'success');
+          form.reset();
+          otpStatus.textContent = '';
+        } catch (err) {
+          msg.innerHTML = `<div class="alert-error">${Avox.esc(err.message)}</div>`;
+        } finally { btn.disabled = false; }
+      });
+    }
+
+    Avox.mountFavicon();
+    if (!Avox.getToken()) {
+      location.replace('/login?next=' + encodeURIComponent(location.pathname));
+    } else {
+      boot();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,462 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#040406" />
+  <title>Avox Roleplay — Admin Control</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="ucp-mode">
+  <main class="container ucp-subpage ucp-shell">
+    <div class="ucp-panel admin-panel rise">
+      <div class="admin-head">
+        <div>
+          <h2 style="margin:0;font-size:20px;">Admin Control Panel</h2>
+          <p class="muted" style="margin:4px 0 0;font-size:12px;">Manage players, bans, tickets, news and credits.</p>
+        </div>
+        <span class="tag tag-admin" id="adminBadge">Staff</span>
+      </div>
+
+      <div class="tabs admin-tabs" id="tabs">
+        <button data-tab="overview" class="active" id="tabOverview"></button>
+        <button data-tab="users" id="tabUsers"></button>
+        <button data-tab="bans" id="tabBans"></button>
+        <button data-tab="tickets" id="tabTickets"></button>
+        <button data-tab="news" id="tabNews"></button>
+        <button data-tab="credits" id="tabCredits"></button>
+      </div>
+
+      <!-- Overview -->
+      <div id="overviewPanel">
+        <div class="admin-stats-grid" id="statsGrid">
+          <div class="admin-stat"><div class="lbl">Accounts</div><div class="val" id="stUsers">—</div></div>
+          <div class="admin-stat"><div class="lbl">Open tickets</div><div class="val" id="stTickets">—</div></div>
+          <div class="admin-stat"><div class="lbl">Ban records</div><div class="val" id="stBans">—</div></div>
+          <div class="admin-stat"><div class="lbl">Locked</div><div class="val" id="stLocked">—</div></div>
+          <div class="admin-stat"><div class="lbl">Staff</div><div class="val" id="stAdmins">—</div></div>
+        </div>
+      </div>
+
+      <!-- Users -->
+      <div id="usersPanel" class="hidden">
+        <div class="toolbar">
+          <input id="userSearch" type="search" placeholder="Search by username…" />
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>UID</th><th>Player</th><th>Lvl</th><th>Wealth</th><th>Admin</th><th>Status</th><th></th>
+            </tr></thead>
+            <tbody id="userRows"><tr><td colspan="7"><div class="skel" style="height:24px;"></div></td></tr></tbody>
+          </table>
+        </div>
+        <div class="pager" id="userPager"></div>
+      </div>
+
+      <!-- Bans -->
+      <div id="bansPanel" class="hidden">
+        <div class="ucp-panel" style="margin-bottom:16px;padding:16px;">
+          <h3 style="margin:0 0 12px;font-size:15px;">Issue ban</h3>
+          <form id="banForm" class="form" style="gap:12px;">
+            <div id="banMsg"></div>
+            <div class="grid grid-3">
+              <div class="field"><label>Username</label><input name="username" placeholder="Firstname_Lastname" required /></div>
+              <div class="field"><label>Reason</label><input name="reason" maxlength="128" required /></div>
+              <div class="field"><label>Type</label>
+                <select name="permanent"><option value="0">Temporary</option><option value="1">Permanent</option></select>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Add ban</button>
+          </form>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>Player</th><th>By</th><th>Date</th><th>Reason</th><th>Type</th><th></th></tr></thead>
+            <tbody id="banRows"><tr><td colspan="7"><div class="skel" style="height:24px;"></div></td></tr></tbody>
+          </table>
+        </div>
+        <div class="pager" id="banPager"></div>
+      </div>
+
+      <!-- Tickets -->
+      <div id="ticketsPanel" class="hidden">
+        <div id="ticketList" style="display:flex;flex-direction:column;gap:10px;"></div>
+      </div>
+
+      <!-- News -->
+      <div id="newsPanel" class="hidden">
+        <form id="newsForm" class="form ucp-panel" style="margin-bottom:16px;padding:16px;gap:12px;">
+          <h3 style="margin:0;font-size:15px;">Post announcement</h3>
+          <div id="newsMsg"></div>
+          <div class="grid grid-2">
+            <div class="field"><label>Title</label><input name="title" maxlength="140" required /></div>
+            <div class="field"><label>Category</label>
+              <select name="category"><option>Update</option><option>Event</option><option>Patch</option><option>Community</option></select>
+            </div>
+          </div>
+          <div class="field"><label>Body</label><textarea name="body" rows="4" required></textarea></div>
+          <button type="submit" class="btn btn-primary">Publish</button>
+        </form>
+        <div id="newsList" style="display:flex;flex-direction:column;gap:10px;"></div>
+      </div>
+
+      <!-- Credits -->
+      <div id="creditsPanel" class="hidden">
+        <div class="ucp-panel" style="padding:16px;">
+          <h3 style="margin:0 0 12px;font-size:15px;">Manage web credits</h3>
+          <form id="creditForm" class="form" style="gap:12px;">
+            <div id="creditMsg"></div>
+            <div class="grid grid-3">
+              <div class="field"><label>User UID</label><input name="uid" type="number" min="1" required /></div>
+              <div class="field"><label>Amount</label><input name="amount" type="number" min="1" required /></div>
+              <div class="field"><label>Mode</label>
+                <select name="mode"><option value="add">Add credits</option><option value="set">Set balance</option></select>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Apply</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="modalRoot"></div>
+
+  <script src="/js/common.js"></script>
+  <script>
+    const LIMIT = 25;
+    let activeTab = 'overview';
+    let userPage = 1, userSearch = '';
+    let banPage = 1;
+
+    (async () => {
+      if (!await Avox.mountUcpAdminPage({ title: 'Admin Control' })) return;
+      const u = Avox.getUser();
+      document.getElementById('adminBadge').textContent = `Admin L${u.adminlevel || 0}`;
+      initTabs();
+      loadOverview();
+    })();
+
+    function initTabs() {
+      document.getElementById('tabOverview').innerHTML = Avox.svgIcon('home', { size: 14 }) + ' Overview';
+      document.getElementById('tabUsers').innerHTML    = Avox.svgIcon('users', { size: 14 }) + ' Users';
+      document.getElementById('tabBans').innerHTML     = Avox.svgIcon('ban', { size: 14 }) + ' Bans';
+      document.getElementById('tabTickets').innerHTML  = Avox.svgIcon('ticket', { size: 14 }) + ' Tickets';
+      document.getElementById('tabNews').innerHTML     = Avox.svgIcon('news', { size: 14 }) + ' News';
+      document.getElementById('tabCredits').innerHTML  = Avox.svgIcon('money', { size: 14 }) + ' Credits';
+
+      const panels = {
+        overview: 'overviewPanel', users: 'usersPanel', bans: 'bansPanel',
+        tickets: 'ticketsPanel', news: 'newsPanel', credits: 'creditsPanel',
+      };
+
+      document.getElementById('tabs').addEventListener('click', (e) => {
+        const b = e.target.closest('button'); if (!b) return;
+        document.querySelectorAll('#tabs button').forEach((x) => x.classList.remove('active'));
+        b.classList.add('active');
+        activeTab = b.dataset.tab;
+        Object.values(panels).forEach((id) => document.getElementById(id).classList.add('hidden'));
+        document.getElementById(panels[activeTab]).classList.remove('hidden');
+        if (activeTab === 'overview') loadOverview();
+        if (activeTab === 'users') loadUsers();
+        if (activeTab === 'bans') loadBans();
+        if (activeTab === 'tickets') loadTickets();
+        if (activeTab === 'news') loadNews();
+      });
+
+      let deb;
+      document.getElementById('userSearch').addEventListener('input', (e) => {
+        clearTimeout(deb);
+        deb = setTimeout(() => { userSearch = e.target.value.trim(); userPage = 1; loadUsers(); }, 300);
+      });
+
+      document.getElementById('banForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const msg = document.getElementById('banMsg');
+        msg.innerHTML = '';
+        try {
+          await Avox.api('/api/admin/bans', {
+            method: 'POST',
+            body: JSON.stringify({
+              username: fd.get('username'), reason: fd.get('reason'),
+              permanent: fd.get('permanent') === '1',
+            }),
+          });
+          msg.innerHTML = '<div class="alert-success">Ban added.</div>';
+          Avox.toast('Ban issued', 'success');
+          e.target.reset();
+          loadBans();
+        } catch (err) {
+          msg.innerHTML = `<div class="alert-error">${Avox.esc(err.message)}</div>`;
+        }
+      });
+
+      document.getElementById('newsForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const msg = document.getElementById('newsMsg');
+        msg.innerHTML = '';
+        try {
+          await Avox.api('/api/news', {
+            method: 'POST',
+            body: JSON.stringify({ title: fd.get('title'), category: fd.get('category'), body: fd.get('body') }),
+          });
+          msg.innerHTML = '<div class="alert-success">Published.</div>';
+          Avox.toast('News published', 'success');
+          e.target.reset();
+          loadNews();
+        } catch (err) {
+          msg.innerHTML = `<div class="alert-error">${Avox.esc(err.message)}</div>`;
+        }
+      });
+
+      document.getElementById('creditForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const msg = document.getElementById('creditMsg');
+        msg.innerHTML = '';
+        try {
+          const r = await Avox.api(`/api/admin/credits/${fd.get('uid')}`, {
+            method: 'POST',
+            body: JSON.stringify({ amount: Number(fd.get('amount')), mode: fd.get('mode') }),
+          });
+          msg.innerHTML = `<div class="alert-success">Credits updated. New balance: ${Avox.fmtNum(r.balance)}</div>`;
+          Avox.toast('Credits updated', 'success');
+        } catch (err) {
+          msg.innerHTML = `<div class="alert-error">${Avox.esc(err.message)}</div>`;
+        }
+      });
+    }
+
+    async function loadOverview() {
+      try {
+        const s = await Avox.api('/api/admin/stats');
+        document.getElementById('stUsers').textContent   = Avox.fmtNum(s.users);
+        document.getElementById('stTickets').textContent = Avox.fmtNum(s.openTickets);
+        document.getElementById('stBans').textContent    = Avox.fmtNum(s.bans);
+        document.getElementById('stLocked').textContent  = Avox.fmtNum(s.lockedAccounts);
+        document.getElementById('stAdmins').textContent  = Avox.fmtNum(s.admins);
+      } catch (e) {
+        Avox.toast(e.message, 'error');
+      }
+    }
+
+    async function loadUsers() {
+      const body = document.getElementById('userRows');
+      body.innerHTML = '<tr><td colspan="7"><div class="skel" style="height:24px;"></div></td></tr>';
+      try {
+        const q = new URLSearchParams({ page: userPage, limit: LIMIT, search: userSearch });
+        const { rows, total } = await Avox.api(`/api/admin/users?${q}`);
+        body.innerHTML = '';
+        if (!rows.length) {
+          body.innerHTML = '<tr><td colspan="7" class="muted center" style="padding:32px;">No users found.</td></tr>';
+        } else {
+          rows.forEach((u) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td class="mono">${u.uid}</td>
+              <td><b>${Avox.esc(u.username)}</b></td>
+              <td>${u.level}</td>
+              <td class="mono">${Avox.fmtMoney((u.cash || 0) + (u.bank || 0))}</td>
+              <td>${u.adminlevel ? `<span class="tag tag-admin">L${u.adminlevel}</span>` : '—'}</td>
+              <td>${u.locked ? '<span class="tag tag-perm">Locked</span>' : '<span class="tag tag-good">Active</span>'}</td>
+              <td><button class="btn btn-sm btn-primary" data-edit="${u.uid}">Edit</button></td>`;
+            body.appendChild(tr);
+          });
+          body.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () => openUserEditor(Number(b.dataset.edit))));
+        }
+        renderPager('userPager', total, userPage, (p) => { userPage = p; loadUsers(); });
+      } catch (e) {
+        body.innerHTML = `<tr><td colspan="7" class="alert-error">${Avox.esc(e.message)}</td></tr>`;
+      }
+    }
+
+    async function openUserEditor(uid) {
+      const root = document.getElementById('modalRoot');
+      root.innerHTML = '<div class="modal-backdrop"><div class="modal"><div class="skel" style="height:200px;"></div></div></div>';
+      try {
+        const { user, credits, recentBans } = await Avox.api(`/api/admin/users/${uid}`);
+        root.innerHTML = `
+          <div class="modal-backdrop" id="bd">
+            <div class="modal" style="max-width:520px;">
+              <h2>Edit account</h2>
+              <p class="sub">${Avox.esc(user.username)} · UID ${user.uid} · Credits: ${Avox.fmtNum(credits)}</p>
+              <form id="editForm" class="form" style="gap:10px;max-height:60vh;overflow:auto;">
+                <div id="editMsg"></div>
+                <div class="grid grid-2">
+                  <div class="field"><label>Level</label><input name="level" type="number" value="${user.level || 0}" /></div>
+                  <div class="field"><label>EXP</label><input name="exp" type="number" value="${user.exp || 0}" /></div>
+                  <div class="field"><label>Cash</label><input name="cash" type="number" value="${user.cash || 0}" /></div>
+                  <div class="field"><label>Bank</label><input name="bank" type="number" value="${user.bank || 0}" /></div>
+                  <div class="field"><label>Admin level</label><input name="adminlevel" type="number" min="0" value="${user.adminlevel || 0}" /></div>
+                  <div class="field"><label>Helper level</label><input name="helperlevel" type="number" min="0" value="${user.helperlevel || 0}" /></div>
+                  <div class="field"><label>VIP package</label><input name="vippackage" type="number" min="0" value="${user.vippackage || 0}" /></div>
+                  <div class="field"><label>Warnings</label><input name="warnings" type="number" min="0" value="${user.warnings || 0}" /></div>
+                  <div class="field"><label>Crimes</label><input name="crimes" type="number" min="0" value="${user.crimes || 0}" /></div>
+                  <div class="field"><label>Locked</label>
+                    <select name="locked"><option value="0" ${!user.locked ? 'selected' : ''}>No</option><option value="1" ${user.locked ? 'selected' : ''}>Yes</option></select>
+                  </div>
+                </div>
+                ${recentBans.length ? `<div class="muted" style="font-size:12px;">Recent bans: ${recentBans.length}</div>` : ''}
+                <div class="actions">
+                  <button type="button" class="btn btn-ghost" id="cancelEdit">Cancel</button>
+                  <button type="submit" class="btn btn-primary">Save changes</button>
+                </div>
+              </form>
+            </div>
+          </div>`;
+        const close = () => { root.innerHTML = ''; };
+        document.getElementById('cancelEdit').onclick = close;
+        document.getElementById('bd').addEventListener('click', (e) => { if (e.target.id === 'bd') close(); });
+        document.getElementById('editForm').onsubmit = async (e) => {
+          e.preventDefault();
+          const fd = new FormData(e.target);
+          const payload = {};
+          ['level','exp','cash','bank','adminlevel','helperlevel','vippackage','warnings','crimes'].forEach((k) => {
+            payload[k] = Number(fd.get(k));
+          });
+          payload.locked = fd.get('locked') === '1';
+          try {
+            await Avox.api(`/api/admin/users/${uid}`, { method: 'PATCH', body: JSON.stringify(payload) });
+            Avox.toast('Account updated', 'success');
+            close();
+            loadUsers();
+          } catch (err) {
+            document.getElementById('editMsg').innerHTML = `<div class="alert-error">${Avox.esc(err.message)}</div>`;
+          }
+        };
+      } catch (e) {
+        root.innerHTML = '';
+        Avox.toast(e.message, 'error');
+      }
+    }
+
+    async function loadBans() {
+      const body = document.getElementById('banRows');
+      body.innerHTML = '<tr><td colspan="7"><div class="skel" style="height:24px;"></div></td></tr>';
+      try {
+        const q = new URLSearchParams({ page: banPage, limit: LIMIT });
+        const { rows, total } = await Avox.api(`/api/bans?${q}`);
+        body.innerHTML = '';
+        if (!rows.length) {
+          body.innerHTML = '<tr><td colspan="7" class="muted center" style="padding:32px;">No bans.</td></tr>';
+        } else {
+          rows.forEach((b) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td class="mono">${b.id}</td><td><b>${Avox.esc(b.username)}</b></td>
+              <td>${Avox.esc(b.bannedby || '—')}</td>
+              <td class="muted">${Avox.esc(Avox.fmtRelative(b.date))}</td>
+              <td class="muted">${Avox.esc(b.reason || '—')}</td>
+              <td>${b.permanent ? '<span class="tag tag-perm">Perm</span>' : '<span class="tag tag-temp">Temp</span>'}</td>
+              <td><button class="btn btn-sm btn-danger" data-id="${b.id}">Remove</button></td>`;
+            body.appendChild(tr);
+          });
+          body.querySelectorAll('[data-id]').forEach((btn) => btn.addEventListener('click', async () => {
+            if (!confirm('Remove this ban?')) return;
+            try {
+              await Avox.api(`/api/admin/bans/${btn.dataset.id}`, { method: 'DELETE' });
+              Avox.toast('Ban removed', 'success');
+              loadBans();
+            } catch (err) { Avox.toast(err.message, 'error'); }
+          }));
+        }
+        renderPager('banPager', total, banPage, (p) => { banPage = p; loadBans(); });
+      } catch (e) {
+        body.innerHTML = `<tr><td colspan="7" class="alert-error">${Avox.esc(e.message)}</td></tr>`;
+      }
+    }
+
+    async function loadTickets() {
+      const root = document.getElementById('ticketList');
+      root.innerHTML = '<div class="skel" style="height:80px;"></div>';
+      try {
+        const { rows } = await Avox.api('/api/tickets/_admin');
+        if (!rows.length) {
+          root.innerHTML = '<div class="muted center" style="padding:32px;">No tickets.</div>';
+          return;
+        }
+        root.innerHTML = rows.map((t) => `
+          <div class="ucp-panel" style="padding:14px;">
+            <div class="flex-between" style="margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+              <b>${Avox.esc(t.username)}</b>
+              <span class="tag ${t.status === 'open' ? 'tag-temp' : 'tag-good'}">${Avox.esc(t.status)}</span>
+            </div>
+            <div style="font-weight:700;">${Avox.esc(t.subject)}</div>
+            <div class="muted" style="font-size:12px;margin:4px 0 8px;">${Avox.esc(t.kind)} · ${Avox.esc(Avox.fmtRelative(t.created))}</div>
+            <div style="font-size:13px;white-space:pre-wrap;margin-bottom:8px;">${Avox.esc(t.body)}</div>
+            ${t.reply ? `<div class="alert-success" style="font-size:13px;white-space:pre-wrap;">${Avox.esc(t.reply)}</div>` : ''}
+            ${t.status === 'open' ? `
+              <form data-tid="${t.id}" class="ticketReply" style="display:flex;gap:8px;margin-top:10px;">
+                <input name="reply" placeholder="Reply…" style="flex:1;padding:9px 12px;background:rgba(255,255,255,0.04);border:1px solid var(--ucp-border);border-radius:8px;color:var(--text);" />
+                <button type="submit" class="btn btn-sm btn-primary">Reply & close</button>
+              </form>` : ''}
+          </div>`).join('');
+        root.querySelectorAll('form.ticketReply').forEach((f) => {
+          f.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fd = new FormData(f);
+            try {
+              await Avox.api(`/api/tickets/_admin/${f.dataset.tid}/reply`, {
+                method: 'POST',
+                body: JSON.stringify({ reply: fd.get('reply'), status: 'closed' }),
+              });
+              Avox.toast('Reply sent', 'success');
+              loadTickets();
+            } catch (err) { Avox.toast(err.message, 'error'); }
+          });
+        });
+      } catch (e) {
+        root.innerHTML = `<div class="alert-error">${Avox.esc(e.message)}</div>`;
+      }
+    }
+
+    async function loadNews() {
+      const root = document.getElementById('newsList');
+      try {
+        const { rows } = await Avox.api('/api/news?limit=30');
+        if (!rows.length) {
+          root.innerHTML = '<div class="muted center" style="padding:24px;">No news posts.</div>';
+          return;
+        }
+        root.innerHTML = rows.map((n) => `
+          <div class="ucp-panel flex-between" style="padding:14px;flex-wrap:wrap;gap:10px;">
+            <div>
+              <div style="font-weight:700;">${Avox.esc(n.title)}</div>
+              <div class="muted" style="font-size:12px;">${Avox.esc(n.category)} · ${Avox.esc(n.author)} · ${Avox.esc(Avox.fmtRelative(n.created))}</div>
+            </div>
+            <button class="btn btn-sm btn-danger" data-nid="${n.id}">Delete</button>
+          </div>`).join('');
+        root.querySelectorAll('[data-nid]').forEach((b) => b.addEventListener('click', async () => {
+          if (!confirm('Delete this post?')) return;
+          try {
+            await Avox.api(`/api/news/${b.dataset.nid}`, { method: 'DELETE' });
+            Avox.toast('Deleted', 'success');
+            loadNews();
+          } catch (err) { Avox.toast(err.message, 'error'); }
+        }));
+      } catch (e) {
+        root.innerHTML = `<div class="alert-error">${Avox.esc(e.message)}</div>`;
+      }
+    }
+
+    function renderPager(id, total, page, onGo) {
+      const pages = Math.max(1, Math.ceil(total / LIMIT));
+      const root = document.getElementById(id);
+      root.innerHTML = '';
+      const mk = (txt, dis, fn) => {
+        const b = document.createElement('button');
+        b.textContent = txt; b.disabled = dis; b.onclick = fn;
+        return b;
+      };
+      root.append(
+        mk('‹ Prev', page <= 1, () => onGo(page - 1)),
+        Object.assign(document.createElement('span'), { className: 'info', textContent: `Page ${page} of ${pages}` }),
+        mk('Next ›', page >= pages, () => onGo(page + 1)),
+      );
+    }
+  </script>
+</body>
+</html>

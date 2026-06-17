@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 680" fill="none">
+  <defs>
+    <linearGradient id="hoodie" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4c1d95"/>
+      <stop offset="100%" stop-color="#2e1065"/>
+    </linearGradient>
+    <linearGradient id="skin2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#c9956d"/>
+      <stop offset="100%" stop-color="#9a7048"/>
+    </linearGradient>
+    <filter id="sh2" x="-20%" y="-10%" width="140%" height="120%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <g filter="url(#sh2)">
+    <path d="M98 400 L88 640 L118 640 L128 410 Z" fill="#1e1b4b"/>
+    <path d="M182 400 L192 640 L162 640 L152 410 Z" fill="#1e1b4b"/>
+  </g>
+  <path d="M75 240 Q140 205 205 240 L218 400 Q140 425 62 400 Z" fill="url(#hoodie)"/>
+  <path d="M68 250 L35 330 L50 342 L88 262 Z" fill="url(#hoodie)"/>
+  <path d="M212 250 L245 320 L230 332 L194 262 Z" fill="url(#hoodie)"/>
+  <!-- phone -->
+  <rect x="28" y="318" width="26" height="44" rx="5" fill="#111" stroke="#8b3dff" stroke-width="1.5"/>
+  <rect x="32" y="326" width="18" height="28" rx="2" fill="rgba(139,61,255,0.35)"/>
+  <ellipse cx="140" cy="178" rx="44" ry="50" fill="url(#skin2)"/>
+  <path d="M96 160 Q140 118 184 160 Q190 188 180 205 Q140 182 100 205 Q90 188 96 160 Z" fill="#120a1a"/>
+  <rect x="118" y="168" width="22" height="10" rx="2" fill="#0a0a0a"/>
+  <rect x="142" y="168" width="22" height="10" rx="2" fill="#0a0a0a"/>
+  <path d="M120 228 Q140 245 160 228" stroke="#a855f7" stroke-width="2.5" fill="none"/>
+</svg>

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#040406" />
+  <title>Avox Roleplay — Staff Team</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <main class="container">
+    <div id="root" class="rise rise-1"><div class="card"><div class="skel" style="height:200px;"></div></div></div>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script>
+    Avox.mountPage({ active: 'staff', eyebrow: 'Meet the team', title: 'Staff Team', hint: 'The faces behind Avox District.' });
+
+    const ADMIN_RANKS = {
+      1: 'Trial Moderator', 2: 'Moderator', 3: 'Senior Moderator',
+      4: 'Administrator', 5: 'Senior Administrator',
+      6: 'Head Administrator', 7: 'Lead Administrator',
+      8: 'Manager', 9: 'Co-Owner', 10: 'Founder',
+    };
+    function adminRank(level) {
+      return ADMIN_RANKS[level] || `Admin L${level}`;
+    }
+
+    async function load() {
+      const root = document.getElementById('root');
+      try {
+        const { admins, helpers } = await Avox.api('/api/staff');
+
+        // Group by adminlevel
+        const groups = {};
+        admins.forEach((a) => {
+          const key = a.adminlevel;
+          (groups[key] = groups[key] || []).push(a);
+        });
+        const levels = Object.keys(groups).map(Number).sort((a, b) => b - a);
+
+        if (!levels.length && !helpers.length) {
+          root.innerHTML = '<div class="card center muted" style="padding:40px;">No staff data yet.</div>';
+          return;
+        }
+
+        const sections = levels.map((lvl) => `
+          <div class="card" style="margin-bottom:14px;">
+            <div class="section-title" style="margin-bottom:12px;">
+              <h2 style="font-size:18px;">${Avox.esc(adminRank(lvl))}</h2>
+              <span class="tag tag-admin">Level ${lvl}</span>
+            </div>
+            <div class="grid grid-3">
+              ${groups[lvl].map((a) => `
+                <a href="/player?u=${encodeURIComponent(a.username)}" class="org-card" style="text-decoration:none;color:var(--text);">
+                  <div class="logo av-grad-${Avox.avGrad(a.username)}">${Avox.esc(Avox.initials(a.username))}</div>
+                  <div class="info">
+                    <div class="name">${Avox.esc(a.adminname || a.username)}</div>
+                    <div class="sub">${Avox.fmtNum(a.hours)} hrs · ${Avox.esc(Avox.fmtRelative(a.lastlogin))}</div>
+                  </div>
+                </a>
+              `).join('')}
+            </div>
+          </div>
+        `).join('');
+
+        const helpersSection = helpers.length ? `
+          <div class="card">
+            <div class="section-title" style="margin-bottom:12px;">
+              <h2 style="font-size:18px;">Helper Team</h2>
+              <span class="tag tag-good">${helpers.length} helpers</span>
+            </div>
+            <div class="grid grid-3">
+              ${helpers.map((h) => `
+                <a href="/player?u=${encodeURIComponent(h.username)}" class="org-card" style="text-decoration:none;color:var(--text);">
+                  <div class="logo av-grad-${Avox.avGrad(h.username)}">${Avox.esc(Avox.initials(h.username))}</div>
+                  <div class="info">
+                    <div class="name">${Avox.esc(h.username)}</div>
+                    <div class="sub">Helper L${h.helperlevel} · ${Avox.fmtNum(h.hours)} hrs</div>
+                  </div>
+                </a>
+              `).join('')}
+            </div>
+          </div>
+        ` : '';
+
+        root.innerHTML = sections + helpersSection;
+      } catch (e) {
+        root.innerHTML = `<div class="card alert-error">${Avox.esc(e.message)}</div>`;
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

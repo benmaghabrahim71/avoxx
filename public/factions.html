@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#040406" />
+  <title>Avox Roleplay — Factions</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <main class="container" id="root">
+    <div class="card"><div class="skel" style="height:120px;"></div></div>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script>
+    Avox.mountPage({ active: 'factions', eyebrow: 'Law & order', title: 'Factions', hint: 'LSPD, EMS, government and more.' });
+
+    const id = new URLSearchParams(location.search).get('id');
+    id ? loadDetail(Number(id)) : loadList();
+
+    async function loadList() {
+      const root = document.getElementById('root');
+      try {
+        const { rows } = await Avox.api('/api/factions');
+        if (!rows.length) {
+          root.innerHTML = '<div class="card alert-error">No factions found (or DB offline).</div>';
+          return;
+        }
+        root.innerHTML = `<div class="grid grid-2 rise rise-1" id="orgGrid"></div>`;
+        const grid = document.getElementById('orgGrid');
+        rows.forEach((f) => {
+          const a = document.createElement('a');
+          a.href = `/factions?id=${f.id}`;
+          a.className = 'org-card';
+          a.innerHTML = `
+            <div class="logo av-grad-${Avox.avGrad(f.name || ('f'+f.id))}">${Avox.esc(Avox.initials(f.name || 'F'))}</div>
+            <div class="info">
+              <div class="name">${Avox.esc(f.name || ('Faction #'+f.id))}</div>
+              <div class="sub">${Avox.fmtNum(f.members)} members · Treasury ${Avox.fmtMoney(f.bank || f.cash || 0)}</div>
+            </div>
+            <div class="stats">→</div>
+          `;
+          grid.appendChild(a);
+        });
+      } catch (e) {
+        root.innerHTML = `<div class="card alert-error">${Avox.esc(e.message)}</div>`;
+      }
+    }
+
+    async function loadDetail(id) {
+      const root = document.getElementById('root');
+      try {
+        const { faction, members, ranks } = await Avox.api('/api/factions/' + id);
+        root.innerHTML = `
+          <a href="/factions" class="muted" style="font-size:13px;">← Back to factions</a>
+          <div class="profile-hero rise" style="margin-top:12px;">
+            <div class="avatar-xl av-grad-${Avox.avGrad(faction.name || ('f'+faction.id))}">${Avox.esc(Avox.initials(faction.name || 'F'))}</div>
+            <div>
+              <div style="font-family:var(--font-disp);font-size:28px;font-weight:700;">${Avox.esc(faction.name || 'Faction #' + faction.id)}</div>
+              <div class="muted" style="margin-top:4px;">
+                ${Avox.fmtNum(members.length)} members ·
+                Treasury ${Avox.fmtMoney(faction.bank || 0)}
+              </div>
+            </div>
+          </div>
+
+          <div class="spacer"></div>
+
+          <div class="grid grid-2">
+            <div class="card">
+              <h3 style="margin-top:0;">Members</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Player</th><th>Rank</th><th>Hours</th><th>Last seen</th></tr></thead>
+                  <tbody>
+                    ${members.map((m) => `<tr>
+                      <td>
+                        <div class="flex" style="gap:10px;">
+                          <span class="av av-grad-${Avox.avGrad(m.username)}" style="width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:11px;">${Avox.esc(Avox.initials(m.username))}</span>
+                          <a href="/player?u=${encodeURIComponent(m.username)}" style="font-weight:600;color:var(--text);">${Avox.esc(m.username)}</a>
+                        </div>
+                      </td>
+                      <td>${m.factionrank ?? '—'}</td>
+                      <td>${Avox.fmtNum(m.hours)}</td>
+                      <td class="muted">${Avox.esc(Avox.fmtRelative(m.lastlogin))}</td>
+                    </tr>`).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="card">
+              <h3 style="margin-top:0;">Ranks</h3>
+              ${ranks.length ? `<ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;">
+                ${ranks.map((r) => `<li class="flex-between" style="padding:10px 12px;background:rgba(255,255,255,0.025);border:1px solid var(--border);border-radius:8px;">
+                  <b>${Avox.esc(r.name || r.title || ('Rank ' + r.rank))}</b>
+                  <span class="muted">L${r.rank}</span>
+                </li>`).join('')}
+              </ul>` : '<div class="muted">No ranks defined.</div>'}
+            </div>
+          </div>
+        `;
+      } catch (e) {
+        root.innerHTML = `<div class="card alert-error">${Avox.esc(e.message)}</div>`;
+      }
+    }
+  </script>
+</body>
+</html>

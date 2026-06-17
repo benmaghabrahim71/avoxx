@@ -1,0 +1,118 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#040406" />
+  <title>Avox Roleplay — Leaderboard</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <main class="container">
+    <div class="card rise rise-1">
+      <div class="tabs" id="tabs">
+        <button data-cat="level"  class="active" id="tabLevel"></button>
+        <button data-cat="money"  id="tabMoney"></button>
+        <button data-cat="hours"  id="tabHours"></button>
+        <button data-cat="admins" id="tabAdmins"></button>
+      </div>
+
+      <div class="table-wrap">
+        <table id="tbl">
+          <thead><tr>
+            <th style="width:60px;">Rank</th>
+            <th>Player</th>
+            <th id="metricHead">Level</th>
+            <th>Detail</th>
+          </tr></thead>
+          <tbody id="rows"><tr><td colspan="4"><div class="skel" style="height:24px;"></div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script>
+    Avox.mountPage({
+      active: 'leaderboard',
+      eyebrow: 'Hall of fame',
+      title: 'Leaderboards',
+      hint: 'Top players ranked by level, wealth, hours and staff team.',
+    });
+
+    // Tab labels with icons
+    document.getElementById('tabLevel').innerHTML  = Avox.svgIcon('bolt',   { size: 14 }) + ' By Level';
+    document.getElementById('tabMoney').innerHTML  = Avox.svgIcon('money',  { size: 14 }) + ' By Wealth';
+    document.getElementById('tabHours').innerHTML  = Avox.svgIcon('pulse',  { size: 14 }) + ' By Hours';
+    document.getElementById('tabAdmins').innerHTML = Avox.svgIcon('shield', { size: 14 }) + ' Admin Team';
+
+    let category = 'level';
+
+    document.getElementById('tabs').addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      document.querySelectorAll('#tabs button').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      category = btn.dataset.cat;
+      load();
+    });
+
+    async function load() {
+      const tbody = document.getElementById('rows');
+      const head  = document.getElementById('metricHead');
+      tbody.innerHTML = '<tr><td colspan="4"><div class="skel" style="height:24px;"></div></td></tr>';
+
+      const labels = { level: 'Level', money: 'Wealth', hours: 'Hours', admins: 'Admin Level' };
+      head.textContent = labels[category];
+
+      try {
+        const { rows } = await Avox.api(`/api/stats/leaderboard?category=${category}&limit=50`);
+        tbody.innerHTML = '';
+        if (!rows.length) {
+          tbody.innerHTML = '<tr><td colspan="4" class="muted center">No data yet.</td></tr>';
+          return;
+        }
+        rows.forEach((r, i) => {
+          const rank = i + 1;
+          let metric, detail;
+          switch (category) {
+            case 'money':
+              metric = `<span class="mono" style="font-size:15px;font-weight:600;">${Avox.fmtMoney(r.wealth)}</span>`;
+              detail = `${Avox.fmtNum(r.hours)} hrs · Lvl ${r.level}`;
+              break;
+            case 'hours':
+              metric = `<span class="mono" style="font-size:15px;font-weight:600;">${Avox.fmtNum(r.hours)} hrs</span>`;
+              detail = `Level ${r.level}`;
+              break;
+            case 'admins':
+              metric = `<span class="tag tag-admin">L${r.adminlevel}</span>`;
+              detail = r.adminname || '—';
+              break;
+            default:
+              metric = `<span class="mono" style="font-size:15px;font-weight:600;">Level ${r.level}</span>`;
+              detail = `${Avox.fmtNum(r.exp)} XP · ${Avox.fmtNum(r.hours)} hrs`;
+          }
+
+          const rankClass = rank <= 3 ? `rank rank-${rank}` : 'rank';
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><span class="${rankClass}">${rank}</span></td>
+            <td>
+              <div class="flex" style="gap:10px;">
+                <span class="av av-grad-${Avox.avGrad(r.username)}" style="width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0;">${Avox.esc(Avox.initials(r.username))}</span>
+                <b>${Avox.esc(r.username)}</b>
+              </div>
+            </td>
+            <td>${metric}</td>
+            <td class="muted">${Avox.esc(String(detail))}</td>`;
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="4" class="muted center">${Avox.esc(e.message)}</td></tr>`;
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

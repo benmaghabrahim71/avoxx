@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#040406" />
+  <title>Avox Roleplay — Shop</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="ucp-mode">
+  <main class="container ucp-subpage ucp-shell">
+    <div class="shop-balance-card rise reveal" id="creditCard">
+      <div>
+        <div class="label">Your balance</div>
+        <div class="value mono" id="credBal">— credits</div>
+        <div class="muted" style="font-size:12px;margin-top:6px;" id="cashBal">Cash + bank: —</div>
+      </div>
+      <a class="btn btn-primary" href="/tickets" style="text-decoration:none;" id="topUpBtn">Top up</a>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="tabs" id="catTabs">
+      <button data-cat="all"      class="active">All</button>
+      <button data-cat="vip">VIP</button>
+      <button data-cat="cash">Cash drops</button>
+      <button data-cat="vehicle">Vehicles</button>
+      <button data-cat="cosmetic">Cosmetics</button>
+      <button data-cat="boost">Boosters</button>
+      <button data-cat="bundle">Bundles</button>
+    </div>
+
+    <div class="shop-grid rise rise-1" id="shopGrid">
+      <div class="shop-card"><div class="skel" style="height:240px;"></div></div>
+      <div class="shop-card"><div class="skel" style="height:240px;"></div></div>
+      <div class="shop-card"><div class="skel" style="height:240px;"></div></div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="ucp-panel rise">
+      <h3>How to top up credits</h3>
+      <p class="muted">
+        Credits are the in-store currency. You can earn them through donations
+        and event participation. Contact a senior administrator in-game or on
+        our Discord to get credits added to your account. Cash drops, vehicles
+        and cosmetics can also be purchased directly with in-game cash where
+        marked.
+      </p>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="ucp-panel rise" id="ordersCard">
+      <h3>Your recent orders</h3>
+      <div id="orders"><div class="muted">Sign in to see your order history.</div></div>
+    </div>
+  </main>
+
+  <div id="modalRoot"></div>
+
+  <script src="/js/common.js"></script>
+  <script>
+    (async () => {
+      await Avox.runUcpPage({ active: 'shop', title: 'Shop' }, async () => {
+
+    let CATALOG = [];
+    let category = 'all';
+
+    async function loadCatalog() {
+      const r = await Avox.api('/api/shop/items');
+      CATALOG = r.items || [];
+      renderGrid();
+    }
+
+    async function loadBalance() {
+      if (!Avox.getToken()) {
+        document.getElementById('credBal').textContent = 'Sign in';
+        document.getElementById('cashBal').textContent = 'Log in to see your balance';
+        return;
+      }
+      try {
+        const c = await Avox.api('/api/shop/credits');
+        document.getElementById('credBal').textContent = `${Avox.fmtNum(c.balance)} credits`;
+      } catch (_) { document.getElementById('credBal').textContent = '— credits'; }
+
+      try {
+        const me = await Avox.api('/api/auth/me');
+        const u  = me.user;
+        document.getElementById('cashBal').textContent =
+          `Cash ${Avox.fmtMoney(u.cash)} · Bank ${Avox.fmtMoney(u.bank)}`;
+      } catch (_) {}
+    }
+
+    async function loadOrders() {
+      if (!Avox.getToken()) return;
+      try {
+        const { orders } = await Avox.api('/api/shop/orders');
+        const root = document.getElementById('orders');
+        if (!orders.length) {
+          root.innerHTML = '<div class="muted">No orders yet. Browse the shop above!</div>';
+          return;
+        }
+        root.innerHTML = `<div class="table-wrap"><table><thead><tr>
+          <th>Item</th><th>Price</th><th>Method</th><th>Date</th>
+        </tr></thead><tbody>${orders.map((o) => `<tr>
+          <td><b>${Avox.esc(o.item_name)}</b></td>
+          <td class="mono">${o.pay_method === 'credits' ? `${o.price} cr` : Avox.fmtMoney(o.price)}</td>
+          <td>${o.pay_method === 'credits' ? '<span class="tag tag-vip">Credits</span>' : '<span class="tag tag-good">Cash</span>'}</td>
+          <td class="muted">${Avox.esc(Avox.fmtRelative(o.created))}</td>
+        </tr>`).join('')}</tbody></table></div>`;
+      } catch (_) {}
+    }
+
+    function renderGrid() {
+      const grid = document.getElementById('shopGrid');
+      grid.innerHTML = '';
+      const items = CATALOG.filter((i) => category === 'all' || i.category === category);
+      if (!items.length) {
+        grid.innerHTML = '<div class="muted">No items in this category yet.</div>';
+        return;
+      }
+      items.forEach((it) => grid.appendChild(card(it)));
+    }
+
+    function card(it) {
+      const node = document.createElement('div');
+      node.className = 'shop-card' + (it.featured ? ' featured' : '');
+      const tierKey = it.tier || it.category;
+      const tierLabel = (it.tier || it.category).toUpperCase();
+      node.innerHTML = `
+        ${it.featured ? '<div class="ribbon">Popular</div>' : ''}
+        <span class="tier-badge tier-${tierKey}">${tierLabel}</span>
+        <h3>${Avox.esc(it.name)}</h3>
+        <ul class="perks">
+          ${(it.perks || []).map((p) => `<li>${Avox.esc(p)}</li>`).join('')}
+        </ul>
+        <div class="pay">
+          <div>
+            <span class="unit">${it.pay === 'credits' ? 'Credits' : 'In-game cash'}</span>
+            <div class="price">${it.pay === 'credits' ? Avox.fmtNum(it.price) : Avox.fmtMoney(it.price)}</div>
+          </div>
+          <button class="btn btn-primary" data-buy="${it.id}">Buy now</button>
+        </div>
+      `;
+      node.querySelector('[data-buy]').addEventListener('click', () => openBuy(it));
+      return node;
+    }
+
+    function openBuy(it) {
+      if (!Avox.getToken()) {
+        location.href = '/login?next=' + encodeURIComponent('/shop');
+        return;
+      }
+      const root = document.getElementById('modalRoot');
+      const priceLabel = it.pay === 'credits' ? `${Avox.fmtNum(it.price)} credits` : Avox.fmtMoney(it.price);
+      root.innerHTML = `
+        <div class="modal-backdrop" id="bd">
+          <div class="modal">
+            <h2>Confirm purchase</h2>
+            <div class="sub">You're about to buy:</div>
+            <div class="card" style="background:rgba(255,255,255,0.025);padding:16px;">
+              <div style="font-weight:700;font-size:16px;">${Avox.esc(it.name)}</div>
+              <div class="muted" style="font-size:13px;margin-top:4px;">${(it.perks||[]).join(' · ')}</div>
+              <div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;">
+                <span class="muted" style="font-size:12px;text-transform:uppercase;letter-spacing:0.06em;">Total</span>
+                <span class="mono" style="font-size:22px;font-weight:700;color:var(--ucp-gold);">${priceLabel}</span>
+              </div>
+            </div>
+            <div id="buyMsg" style="margin-top:14px;"></div>
+            <div class="actions">
+              <button class="btn btn-ghost" id="cancelBtn">Cancel</button>
+              <button class="btn btn-primary" id="confirmBtn">Confirm purchase</button>
+            </div>
+          </div>
+        </div>
+      `;
+      const close = () => { root.innerHTML = ''; };
+      document.getElementById('cancelBtn').onclick = close;
+      document.getElementById('bd').addEventListener('click', (e) => { if (e.target.id === 'bd') close(); });
+
+      document.getElementById('confirmBtn').onclick = async () => {
+        const msg = document.getElementById('buyMsg');
+        msg.innerHTML = '';
+        const btn = document.getElementById('confirmBtn');
+        btn.disabled = true; btn.textContent = 'Processing…';
+        try {
+          const r = await Avox.api('/api/shop/buy', {
+            method: 'POST',
+            body: JSON.stringify({ itemId: it.id }),
+          });
+          msg.innerHTML = `<div class="alert-success">${Avox.esc(r.message)}<br/>${(r.effects||[]).map(Avox.esc).join('<br/>')}</div>`;
+          Avox.toast('Purchase successful', 'success');
+          loadBalance(); loadOrders();
+          setTimeout(close, 1800);
+        } catch (e) {
+          msg.innerHTML = `<div class="alert-error">${Avox.esc(e.message)}</div>`;
+          btn.disabled = false; btn.textContent = 'Confirm purchase';
+        }
+      };
+    }
+
+    document.getElementById('catTabs').addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      document.querySelectorAll('#catTabs button').forEach((x) => x.classList.remove('active'));
+      b.classList.add('active');
+      category = b.dataset.cat;
+      renderGrid();
+    });
+
+    loadCatalog();
+    loadBalance();
+    loadOrders();
+      });
+    })();
+  </script>
+</body>
+</html>

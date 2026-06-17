@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#040406" />
+  <title>Avox Roleplay — Gangs</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <main class="container" id="root">
+    <div class="card"><div class="skel" style="height:120px;"></div></div>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script>
+    Avox.mountPage({ active: 'gangs', eyebrow: 'The streets', title: 'Gangs', hint: 'Crews, turfs and street hierarchy.' });
+
+    const id = new URLSearchParams(location.search).get('id');
+    id ? loadDetail(Number(id)) : loadList();
+
+    async function loadList() {
+      const root = document.getElementById('root');
+      try {
+        const { rows } = await Avox.api('/api/gangs');
+        if (!rows.length) {
+          root.innerHTML = '<div class="card muted">No gangs registered yet.</div>';
+          return;
+        }
+        root.innerHTML = `<div class="grid grid-2 rise rise-1" id="orgGrid"></div>`;
+        const grid = document.getElementById('orgGrid');
+        rows.forEach((g) => {
+          const a = document.createElement('a');
+          a.href = `/gangs?id=${g.id}`;
+          a.className = 'org-card';
+          a.innerHTML = `
+            <div class="logo av-grad-${Avox.avGrad(g.name || ('g'+g.id))}">${Avox.esc(Avox.initials(g.name || 'G'))}</div>
+            <div class="info">
+              <div class="name">${Avox.esc(g.name || ('Gang #'+g.id))}</div>
+              <div class="sub">${Avox.fmtNum(g.members)} members · ${Avox.fmtNum(g.turfs)} turfs</div>
+            </div>
+            <div class="stats">→</div>
+          `;
+          grid.appendChild(a);
+        });
+      } catch (e) {
+        root.innerHTML = `<div class="card alert-error">${Avox.esc(e.message)}</div>`;
+      }
+    }
+
+    async function loadDetail(id) {
+      const root = document.getElementById('root');
+      try {
+        const { gang, members } = await Avox.api('/api/gangs/' + id);
+        root.innerHTML = `
+          <a href="/gangs" class="muted" style="font-size:13px;">← Back to gangs</a>
+          <div class="profile-hero rise" style="margin-top:12px;">
+            <div class="avatar-xl av-grad-${Avox.avGrad(gang.name || ('g'+gang.id))}">${Avox.esc(Avox.initials(gang.name || 'G'))}</div>
+            <div>
+              <div style="font-family:var(--font-disp);font-size:28px;font-weight:700;">${Avox.esc(gang.name || 'Gang #' + gang.id)}</div>
+              <div class="muted" style="margin-top:4px;">${Avox.fmtNum(members.length)} members</div>
+            </div>
+          </div>
+          <div class="spacer"></div>
+          <div class="card">
+            <h3 style="margin-top:0;">Members</h3>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Player</th><th>Rank</th><th>Hours</th><th>Last seen</th></tr></thead>
+                <tbody>
+                  ${members.map((m) => `<tr>
+                    <td>
+                      <div class="flex" style="gap:10px;">
+                        <span class="av av-grad-${Avox.avGrad(m.username)}" style="width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:11px;">${Avox.esc(Avox.initials(m.username))}</span>
+                        <a href="/player?u=${encodeURIComponent(m.username)}" style="font-weight:600;color:var(--text);">${Avox.esc(m.username)}</a>
+                      </div>
+                    </td>
+                    <td>${m.gangrank ?? '—'}</td>
+                    <td>${Avox.fmtNum(m.hours)}</td>
+                    <td class="muted">${Avox.esc(Avox.fmtRelative(m.lastlogin))}</td>
+                  </tr>`).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      } catch (e) {
+        root.innerHTML = `<div class="card alert-error">${Avox.esc(e.message)}</div>`;
+      }
+    }
+  </script>
+</body>
+</html>

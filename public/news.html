@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#040406" />
+  <title>Avox Roleplay — News</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <main class="container">
+    <div id="composer" class="card hidden" style="margin-bottom:18px;">
+      <h3 style="margin-top:0;font-size:16px;">Post an announcement (admin only)</h3>
+      <form id="newsForm" class="form">
+        <div id="newsMsg"></div>
+        <div class="grid grid-2">
+          <div class="field"><label>Title</label><input name="title" maxlength="140" required /></div>
+          <div class="field"><label>Category</label>
+            <select name="category">
+              <option>Update</option><option>Event</option>
+              <option>Patch</option><option>Community</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>Body</label>
+          <textarea name="body" rows="5" required></textarea></div>
+        <button type="submit" class="btn btn-primary" style="align-self:flex-start;">Publish</button>
+      </form>
+    </div>
+
+    <div id="list" style="display:flex;flex-direction:column;gap:14px;" class="rise rise-1">
+      <div class="news-item"><div class="skel" style="height:90px;"></div></div>
+      <div class="news-item"><div class="skel" style="height:90px;"></div></div>
+    </div>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script>
+    Avox.mountPage({ active: 'news', eyebrow: "What's new", title: 'Server News', hint: 'Updates, events and announcements.' });
+
+    const u = Avox.getUser();
+    if (u && Avox.isAdmin(u)) {
+      document.getElementById('composer').classList.remove('hidden');
+    }
+
+    document.getElementById('newsForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const msg = document.getElementById('newsMsg');
+      msg.innerHTML = '';
+      try {
+        await Avox.api('/api/news', {
+          method: 'POST',
+          body: JSON.stringify({
+            title: fd.get('title'),
+            category: fd.get('category'),
+            body: fd.get('body'),
+          }),
+        });
+        e.target.reset();
+        Avox.toast('Announcement published', 'success');
+        load();
+      } catch (err) {
+        msg.innerHTML = `<div class="alert-error">${Avox.esc(err.message)}</div>`;
+      }
+    });
+
+    async function load() {
+      const list = document.getElementById('list');
+      try {
+        const { rows } = await Avox.api('/api/news?limit=30');
+        if (!rows.length) {
+          list.innerHTML = '<div class="card center muted" style="padding:48px 24px;">No news yet. Check back soon!</div>';
+          return;
+        }
+        list.innerHTML = rows.map((n) => `
+          <article class="news-item">
+            <div class="meta">
+              <span class="tag cat-${(n.category||'update').toLowerCase()}">${Avox.esc(n.category)}</span>
+              <span>by <b>${Avox.esc(n.author)}</b></span>
+              <span>·</span>
+              <span>${Avox.esc(Avox.fmtRelative(n.created))}</span>
+            </div>
+            <h3>${Avox.esc(n.title)}</h3>
+            <div class="body">${Avox.esc(n.body)}</div>
+          </article>
+        `).join('');
+      } catch (e) {
+        list.innerHTML = `<div class="card alert-error">${Avox.esc(e.message)}</div>`;
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

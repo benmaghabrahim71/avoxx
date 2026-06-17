@@ -1,0 +1,109 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#040406" />
+  <title>Avox Roleplay — Banlist</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <main class="container">
+    <div class="card rise rise-1">
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Search by username, admin, or reason…" />
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>Banned by</th>
+              <th>Date</th>
+              <th>Reason</th>
+              <th>Type</th>
+            </tr>
+          </thead>
+          <tbody id="rows"><tr><td colspan="5"><div class="skel" style="height:24px;"></div></td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="pager" id="pager"></div>
+    </div>
+  </main>
+
+  <script src="/js/common.js"></script>
+  <script>
+    Avox.mountPage({
+      active: 'bans',
+      eyebrow: 'Public records',
+      title: 'Banlist',
+      hint: 'Transparent ban records — search by player, admin or reason.',
+      actions: '<span class="pill" id="totalPill"><span class="dot"></span><span id="total">—</span></span>',
+    });
+
+    let page = 1, search = '';
+    const limit = 25;
+
+    const input = document.getElementById('search');
+    let debounce;
+    input.addEventListener('input', () => {
+      clearTimeout(debounce);
+      debounce = setTimeout(() => { search = input.value.trim(); page = 1; load(); }, 300);
+    });
+
+    async function load() {
+      const tbody = document.getElementById('rows');
+      tbody.innerHTML = '<tr><td colspan="5"><div class="skel" style="height:24px;"></div></td></tr>';
+      try {
+        const q = new URLSearchParams({ page, limit, search });
+        const { rows, total } = await Avox.api(`/api/bans?${q}`);
+        document.getElementById('total').textContent = `${Avox.fmtNum(total)} bans on record`;
+        document.getElementById('totalPill').classList.add(total > 0 ? 'offline' : 'online');
+
+        tbody.innerHTML = '';
+        if (!rows.length) {
+          tbody.innerHTML = '<tr><td colspan="5" class="muted center" style="padding:40px 0;">No bans found.</td></tr>';
+        } else {
+          rows.forEach((b) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>
+                <div class="flex" style="gap:10px;">
+                  <span class="av av-grad-${Avox.avGrad(b.username)}" style="width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:12px;flex-shrink:0;">${Avox.esc(Avox.initials(b.username))}</span>
+                  <b>${Avox.esc(b.username)}</b>
+                </div>
+              </td>
+              <td>${Avox.esc(b.bannedby || '—')}</td>
+              <td class="muted">${Avox.esc(Avox.fmtDate(b.date))}</td>
+              <td class="muted" style="max-width:340px;">${Avox.esc(b.reason || '—')}</td>
+              <td>${b.permanent ? '<span class="tag tag-perm">Permanent</span>' : '<span class="tag tag-temp">Temporary</span>'}</td>`;
+            tbody.appendChild(tr);
+          });
+        }
+        renderPager(total);
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5" class="muted center">${Avox.esc(e.message)}</td></tr>`;
+      }
+    }
+
+    function renderPager(total) {
+      const pages = Math.max(1, Math.ceil(total / limit));
+      const pager = document.getElementById('pager');
+      pager.innerHTML = '';
+      const prev = document.createElement('button');
+      prev.textContent = '‹ Prev'; prev.disabled = page <= 1;
+      prev.onclick = () => { page--; load(); };
+      const info = document.createElement('span');
+      info.className = 'info'; info.textContent = `Page ${page} of ${pages}`;
+      const next = document.createElement('button');
+      next.textContent = 'Next ›'; next.disabled = page >= pages;
+      next.onclick = () => { page++; load(); };
+      pager.append(prev, info, next);
+    }
+
+    load();
+  </script>
+</body>
+</html>

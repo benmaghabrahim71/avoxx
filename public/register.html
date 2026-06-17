@@ -1,0 +1,155 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#040406" />
+  <title>Avox Roleplay — Create account</title>
+  <meta name="description" content="Create your Avox Roleplay account — one identity, infinite stories." />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="ucp-mode">
+  <div class="auth-wrap">
+    <aside class="auth-visual" aria-hidden="true">
+      <img class="char" src="/img/hero-character.png" alt="" onerror="this.onerror=null;this.src='/img/hero-character-main.svg'" />
+      <div class="caption">
+        <h2>Start Your <span class="hl">Avox</span> Story</h2>
+        <p>
+          Become a citizen of Avox City — one account, one identity, infinite stories.
+          Pick your in-game name and a password now. You'll finish setting up your character
+          the first time you connect in-game. Secure Whirlpool password hashing keeps you safe.
+        </p>
+      </div>
+    </aside>
+
+    <main class="auth-form-wrap">
+      <div class="auth-card">
+        <a href="/login" class="brand-mark" aria-label="Avox login">A</a>
+        <h1>Create Account</h1>
+        <div class="sub">
+          <span class="dot-ic" id="subIcon"></span>
+          <span>Join the city in under a minute</span>
+        </div>
+
+        <form id="regForm" class="form" novalidate>
+          <div id="msg"></div>
+
+          <div class="field">
+            <label for="username">Username</label>
+            <div class="input-icon">
+              <span class="lead-ic" id="userIcon"></span>
+              <input id="username" name="username" type="text" autocomplete="username"
+                     placeholder="Firstname_Lastname" required />
+            </div>
+            <div class="hint">Format <code>John_Smith</code> · letters only, 24 chars max.</div>
+          </div>
+
+          <div class="field">
+            <label for="password">Password</label>
+            <div class="input-icon">
+              <span class="lead-ic" id="lockIcon1"></span>
+              <input id="password" name="password" type="password" autocomplete="new-password"
+                     placeholder="At least 4 characters" required minlength="4" maxlength="64" />
+              <button type="button" class="trail-btn" data-target="password" aria-label="Show password">
+                <span class="eye-slot"></span>
+              </button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="confirm">Confirm Password</label>
+            <div class="input-icon">
+              <span class="lead-ic" id="lockIcon2"></span>
+              <input id="confirm" name="confirm" type="password" autocomplete="new-password"
+                     placeholder="Repeat your password" required />
+              <button type="button" class="trail-btn" data-target="confirm" aria-label="Show password">
+                <span class="eye-slot"></span>
+              </button>
+            </div>
+          </div>
+
+          <button id="submitBtn" type="submit" class="btn-auth">
+            <span id="btnLock"></span>
+            <span id="btnLabel">Create account</span>
+            <span class="arr" id="btnArrow"></span>
+          </button>
+        </form>
+
+        <div class="alt">
+          Already a citizen? <a href="/login">Log in →</a>
+        </div>
+
+        <div class="copy">© <span id="year"></span> Avox Roleplay</div>
+      </div>
+    </main>
+
+    <div class="auth-legal">
+      <a href="#" data-discord target="_blank" rel="noopener">Discord</a>
+      <span class="sep">|</span>
+      <a href="/rules">Terms of Service</a>
+      <span class="sep">|</span>
+      <a href="/rules">Return Policy</a>
+    </div>
+  </div>
+
+  <script src="/js/common.js"></script>
+  <script>
+    Avox.mountAuthPage();
+    if (Avox.getToken()) location.href = '/ucp';
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    document.getElementById('subIcon').innerHTML   = Avox.svgIcon('sparkle', { size: 10 });
+    document.getElementById('userIcon').innerHTML  = Avox.svgIcon('user',    { size: 18 });
+    document.getElementById('lockIcon1').innerHTML = Avox.svgIcon('lock',    { size: 18 });
+    document.getElementById('lockIcon2').innerHTML = Avox.svgIcon('lock',    { size: 18 });
+    document.getElementById('btnLock').innerHTML   = Avox.svgIcon('lock',    { size: 16 });
+    document.getElementById('btnArrow').innerHTML  = Avox.svgIcon('arrow',   { size: 16 });
+
+    document.querySelectorAll('.trail-btn').forEach((btn) => {
+      const slot = btn.querySelector('.eye-slot');
+      slot.innerHTML = Avox.svgIcon('eye', { size: 18 });
+      btn.addEventListener('click', () => {
+        const input = document.getElementById(btn.dataset.target);
+        const hidden = input.type === 'password';
+        input.type = hidden ? 'text' : 'password';
+        slot.innerHTML = Avox.svgIcon(hidden ? 'eyeOff' : 'eye', { size: 18 });
+        btn.setAttribute('aria-label', hidden ? 'Hide password' : 'Show password');
+      });
+    });
+
+    const form  = document.getElementById('regForm');
+    const msg   = document.getElementById('msg');
+    const btn   = document.getElementById('submitBtn');
+    const label = document.getElementById('btnLabel');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.innerHTML = '';
+
+      const username = form.username.value.trim();
+      const password = form.password.value;
+      const confirm  = form.confirm.value;
+
+      if (password !== confirm) {
+        msg.innerHTML = '<div class="alert-error">Passwords do not match.</div>';
+        return;
+      }
+
+      btn.disabled = true; label.textContent = 'Creating account…';
+      try {
+        const data = await Avox.api('/api/auth/register', {
+          method: 'POST',
+          body: JSON.stringify({ username, password }),
+        });
+        Avox.setToken(data.token);
+        Avox.setUser(data.user);
+        Avox.toast('Welcome to Avox, ' + data.user.username + '!', 'success');
+        setTimeout(() => location.href = '/ucp', 400);
+      } catch (err) {
+        msg.innerHTML = `<div class="alert-error">${Avox.esc(err.message)}</div>`;
+        btn.disabled = false; label.textContent = 'Create account';
+      }
+    });
+  </script>
+</body>
+</html>
